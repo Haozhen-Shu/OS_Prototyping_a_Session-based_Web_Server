@@ -1,0 +1,9 @@
+#include <stdio.h>
+int main(){
+   int *p = NULL;
+   *p = 6;
+   return 0;
+}
+
+
+// When I run it, I saw the segmentation fault error.
