@@ -147,6 +147,10 @@ bool is_str_numeric(const char str[]) {
  * @param message the message to be processed
  * @return a boolean that determines if the given message is valid
  */
+bool is_valid_variable(char var){
+    return isalpha(var) && islower(var);
+}
+
 bool process_message(int session_id, const char message[]) {
     char *token;
     int result_idx;
@@ -160,9 +164,15 @@ bool process_message(int session_id, const char message[]) {
 
     // Processes the result variable.
     token = strtok(data, " ");
+    if (token == NULL || !is_valid_variable(token[0])) {
+        return false; // Invalid variable name
+    }
     result_idx = token[0] - 'a';
 
     // Processes "=".
+    if (token == NULL || strcmp(token, "=") != 0) {
+        return false; // Invalid format
+    }
     token = strtok(NULL, " ");
 
     // Processes the first variable/value.
@@ -171,6 +181,9 @@ bool process_message(int session_id, const char message[]) {
         first_value = strtod(token, NULL);
     } else {
         int first_idx = token[0] - 'a';
+        if (first_idx < 0 || !session_list[session_id].variables[first_idx]) {
+            return false; // Variable does not exist or not assigned
+        }
         first_value = session_list[session_id].values[first_idx];
     }
 
@@ -185,10 +198,16 @@ bool process_message(int session_id, const char message[]) {
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
+    if (token == NULL) {
+        return false; // Invalid format
+    }
     if (is_str_numeric(token)) {
         second_value = strtod(token, NULL);
     } else {
         int second_idx = token[0] - 'a';
+        if (second_idx < 0 || !session_list[session_id].variables[second_idx]) {
+            return false; // Variable does not exist or not assigned
+        }
         second_value = session_list[session_id].values[second_idx];
     }
 
@@ -204,7 +223,12 @@ bool process_message(int session_id, const char message[]) {
     } else if (symbol == '*') {
         session_list[session_id].values[result_idx] = first_value * second_value;
     } else if (symbol == '/') {
+        if (second_value == 0.0) {
+            return false; // Division by zero
+        }
         session_list[session_id].values[result_idx] = first_value / second_value;
+    } else {
+        return false;
     }
 
     return true;
