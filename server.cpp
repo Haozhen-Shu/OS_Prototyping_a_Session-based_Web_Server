@@ -177,6 +177,9 @@ bool process_message(int session_id, const char message[]) {
 
     // Processes the first variable/value.
     token = strtok(NULL, " ");
+    if (token == NULL) {
+        return false; // Invalid format
+    }
     if (is_str_numeric(token)) {
         first_value = strtod(token, NULL);
     } else {
@@ -213,6 +216,9 @@ bool process_message(int session_id, const char message[]) {
 
     // No data should be left over thereafter.
     token = strtok(NULL, " ");
+    if (token != NULL) {
+    return false; // Invalid format
+    }
 
     session_list[session_id].variables[result_idx] = true;
 
