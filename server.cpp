@@ -151,6 +151,18 @@ bool is_valid_variable(char var){
     return isalpha(var) && islower(var);
 }
 
+// Sends an error message to the browser with the given session ID.
+void send_error_message(int session_id) {
+    char error_message[] = "ERROR";
+    broadcast(session_id, error_message);
+}
+
+// Checks if the given character is a valid arithmetic operator.
+bool is_valid_operator(char op) {
+    return op == '+' || op == '-' || op == '*' || op == '/';
+}
+
+
 bool process_message(int session_id, const char message[]) {
     char *token;
     int result_idx;
@@ -165,19 +177,23 @@ bool process_message(int session_id, const char message[]) {
     // Processes the result variable.
     token = strtok(data, " ");
     if (token == NULL || !is_valid_variable(token[0])) {
+        send_error_message(session_id);
         return false; // Invalid variable name
     }
     result_idx = token[0] - 'a';
 
     // Processes "=".
+    token = strtok(NULL, " ");
     if (token == NULL || strcmp(token, "=") != 0) {
+        send_error_message(session_id);
         return false; // Invalid format
     }
-    token = strtok(NULL, " ");
+
 
     // Processes the first variable/value.
     token = strtok(NULL, " ");
     if (token == NULL) {
+        send_error_message(session_id);
         return false; // Invalid format
     }
     if (is_str_numeric(token)) {
@@ -185,6 +201,7 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int first_idx = token[0] - 'a';
         if (first_idx < 0 || !session_list[session_id].variables[first_idx]) {
+            send_error_message(session_id);
             return false; // Variable does not exist or not assigned
         }
         first_value = session_list[session_id].values[first_idx];
@@ -197,11 +214,16 @@ bool process_message(int session_id, const char message[]) {
         session_list[session_id].values[result_idx] = first_value;
         return true;
     }
+    if (strlen(token) != 1 || !is_valid_operator(token[0])) {
+        send_error_message(session_id);
+        return false; // Invalid operator
+    }
     symbol = token[0];
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
     if (token == NULL) {
+        send_error_message(session_id);
         return false; // Invalid format
     }
     if (is_str_numeric(token)) {
@@ -209,6 +231,7 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int second_idx = token[0] - 'a';
         if (second_idx < 0 || !session_list[session_id].variables[second_idx]) {
+            send_error_message(session_id);
             return false; // Variable does not exist or not assigned
         }
         second_value = session_list[session_id].values[second_idx];
@@ -217,7 +240,8 @@ bool process_message(int session_id, const char message[]) {
     // No data should be left over thereafter.
     token = strtok(NULL, " ");
     if (token != NULL) {
-    return false; // Invalid format
+        send_error_message(session_id);
+        return false; // Invalid format
     }
 
     session_list[session_id].variables[result_idx] = true;
@@ -230,15 +254,18 @@ bool process_message(int session_id, const char message[]) {
         session_list[session_id].values[result_idx] = first_value * second_value;
     } else if (symbol == '/') {
         if (second_value == 0.0) {
-            return false; // Division by zero
+        send_error_message(session_id);
+        return false; // Division by zero
         }
         session_list[session_id].values[result_idx] = first_value / second_value;
     } else {
-        return false;
+        send_error_message(session_id);
+        return false; // Invalid operator
     }
-
+    printf("Processing message: %s\n", message);
     return true;
 }
+
 
 /**
  * Broadcasts the given message to all browsers with the same session ID.

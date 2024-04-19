@@ -109,8 +109,20 @@ void register_server() {
  */
 void server_listener() {
     char message[BUFFER_LEN];
-    receive_message(server_socket_fd, message);
-    puts(message);
+    ssize_t received_bytes;
+
+    while (browser_on) {
+        received_bytes = receive_message(server_socket_fd, message);
+        if (received_bytes <= 0) {
+            break; // Exit loop if no more data received
+        }
+
+        if (strcmp(message, "ERROR") == 0) {
+            printf("Invalid input!\n");
+        } else {
+            printf("%s\n", message);
+        }
+    }
 }
 
 /**
