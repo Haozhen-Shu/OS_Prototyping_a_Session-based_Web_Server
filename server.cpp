@@ -23,6 +23,9 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
+#include <unordered_map>
+#include <unordered_set>
+
 
 #define NUM_VARIABLES 26
 #define NUM_SESSIONS 128
@@ -41,6 +44,9 @@ typedef struct session_struct {
     bool variables[NUM_VARIABLES];
     double values[NUM_VARIABLES];
 } session_t;
+
+std::unordered_map<int, session_t> session_map; // Declare session_map as a global variable
+std::unordered_set<int> used_session_ids;
 
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
@@ -96,21 +102,23 @@ void start_server(int port);
  */
 void session_to_str(int session_id, char result[]) {
     memset(result, 0, BUFFER_LEN);
-    session_t session = session_list[session_id];
+    if (session_map.find(session_id) != session_map.end()) {
+        session_t session = session_map[session_id];
 
-    for (int i = 0; i < NUM_VARIABLES; ++i) {
-        if (session.variables[i]) {
-            char line[32];
+        for (int i = 0; i < NUM_VARIABLES; ++i) {
+            if (session.variables[i]) {
+                char line[32];
 
-            if (session.values[i] < 1000) {
-                sprintf(line, "%c = %.6f\n", 'a' + i, session.values[i]);
-            } else {
-                sprintf(line, "%c = %.8e\n", 'a' + i, session.values[i]);
+                if (session.values[i] < 1000) {
+                    sprintf(line, "%c = %.6f\n", 'a' + i, session.values[i]);
+                } else {
+                    sprintf(line, "%c = %.8e\n", 'a' + i, session.values[i]);
+                }
+
+                strcat(result, line);
             }
-
-            strcat(result, line);
         }
-    }
+    }  
 }
 
 /**
@@ -200,18 +208,18 @@ bool process_message(int session_id, const char message[]) {
         first_value = strtod(token, NULL);
     } else {
         int first_idx = token[0] - 'a';
-        if (first_idx < 0 || !session_list[session_id].variables[first_idx]) {
+        if (first_idx < 0 || session_map.find(session_id) == session_map.end() || !session_map[session_id].variables[first_idx]) {
             send_error_message(session_id);
             return false; // Variable does not exist or not assigned
         }
-        first_value = session_list[session_id].values[first_idx];
+        first_value = session_map[session_id].values[first_idx];
     }
 
     // Processes the operation symbol.
     token = strtok(NULL, " ");
     if (token == NULL) {
-        session_list[session_id].variables[result_idx] = true;
-        session_list[session_id].values[result_idx] = first_value;
+        session_map[session_id].variables[result_idx] = true;
+        session_map[session_id].values[result_idx] = first_value;
         return true;
     }
     if (strlen(token) != 1 || !is_valid_operator(token[0])) {
@@ -226,15 +234,16 @@ bool process_message(int session_id, const char message[]) {
         send_error_message(session_id);
         return false; // Invalid format
     }
+    
     if (is_str_numeric(token)) {
         second_value = strtod(token, NULL);
     } else {
         int second_idx = token[0] - 'a';
-        if (second_idx < 0 || !session_list[session_id].variables[second_idx]) {
+        if (second_idx < 0 || session_map.find(session_id) == session_map.end() || !session_map[session_id].variables[second_idx]) {
             send_error_message(session_id);
             return false; // Variable does not exist or not assigned
         }
-        second_value = session_list[session_id].values[second_idx];
+        second_value = session_map[session_id].values[second_idx];
     }
 
     // No data should be left over thereafter.
@@ -244,20 +253,20 @@ bool process_message(int session_id, const char message[]) {
         return false; // Invalid format
     }
 
-    session_list[session_id].variables[result_idx] = true;
+    session_map[session_id].variables[result_idx] = true;
 
     if (symbol == '+') {
-        session_list[session_id].values[result_idx] = first_value + second_value;
+        session_map[session_id].values[result_idx] = first_value + second_value;
     } else if (symbol == '-') {
-        session_list[session_id].values[result_idx] = first_value - second_value;
+        session_map[session_id].values[result_idx] = first_value - second_value;
     } else if (symbol == '*') {
-        session_list[session_id].values[result_idx] = first_value * second_value;
+        session_map[session_id].values[result_idx] = first_value * second_value;
     } else if (symbol == '/') {
         if (second_value == 0.0) {
         send_error_message(session_id);
         return false; // Division by zero
         }
-        session_list[session_id].values[result_idx] = first_value / second_value;
+        session_map[session_id].values[result_idx] = first_value / second_value;
     } else {
         send_error_message(session_id);
         return false; // Invalid operator
@@ -316,6 +325,20 @@ void save_session(int session_id) {
  * @param browser_socket_fd the socket file descriptor of the browser connected
  * @return the ID for the browser
  */
+
+int generate_unique_session_id() {
+    // Seed the random number generator with the current time
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
+
+    int session_id;
+    do {
+        // Generate a random session ID
+        session_id = std::rand();
+    } while (used_session_ids.count(session_id) > 0); // Check if ID is already used
+
+    used_session_ids.insert(session_id);
+    return session_id;
+}
 int register_browser(int browser_socket_fd) {
     int browser_id;
 
@@ -328,21 +351,15 @@ int register_browser(int browser_socket_fd) {
         }
     }
 
-    char message[BUFFER_LEN];
-    receive_message(browser_socket_fd, message);
+    
+    int session_id = generate_unique_session_id();
+    session_t new_session;
+    new_session.in_use = true;
+    session_map[session_id] = new_session;
 
-    int session_id = strtol(message, NULL, 10);
-    if (session_id == -1) {
-        for (int i = 0; i < NUM_SESSIONS; ++i) {
-            if (!session_list[i].in_use) {
-                session_id = i;
-                session_list[session_id].in_use = true;
-                break;
-            }
-        }
-    }
     browser_list[browser_id].session_id = session_id;
 
+    char message[BUFFER_LEN];
     sprintf(message, "%d", session_id);
     send_message(browser_socket_fd, message);
 
