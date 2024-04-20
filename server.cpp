@@ -102,6 +102,8 @@ void start_server(int port);
  */
 void session_to_str(int session_id, char result[]) {
     memset(result, 0, BUFFER_LEN);
+
+    // Check if the session ID exists in the map
     if (session_map.find(session_id) != session_map.end()) {
         session_t session = session_map[session_id];
 
@@ -118,7 +120,7 @@ void session_to_str(int session_id, char result[]) {
                 strcat(result, line);
             }
         }
-    }  
+    }
 }
 
 /**
@@ -327,18 +329,17 @@ void save_session(int session_id) {
  */
 
 int generate_unique_session_id() {
-    // Seed the random number generator with the current time
-    std::srand(static_cast<unsigned int>(std::time(nullptr)));
-
-    int session_id;
+   int session_id;
     do {
         // Generate a random session ID
-        session_id = std::rand();
+        session_id = rand();
     } while (used_session_ids.count(session_id) > 0); // Check if ID is already used
 
     used_session_ids.insert(session_id);
+   
     return session_id;
 }
+
 int register_browser(int browser_socket_fd) {
     int browser_id;
 
