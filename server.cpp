@@ -78,7 +78,7 @@ int register_browser(int browser_socket_fd);
 // processing the message received,
 // broadcasting the update to all browsers with the same session ID,
 // and backing up the session on the disk.
-void browser_handler(int browser_socket_fd);
+void * browser_handler(int browser_socket_fd);
 
 // Starts the server.
 // Sets up the connection,
@@ -264,9 +264,11 @@ int register_browser(int browser_socket_fd) {
 
     for (int i = 0; i < NUM_BROWSER; ++i) {
         if (!browser_list[i].in_use) {
+            pthread_mutex_lock(&browser_list_mutex);
             browser_id = i;
             browser_list[browser_id].in_use = true;
             browser_list[browser_id].socket_fd = browser_socket_fd;
+            pthread_mutex_unlock(&browser_list_mutex);
             break;
         }
     }
@@ -278,8 +280,10 @@ int register_browser(int browser_socket_fd) {
     if (session_id == -1) {
         for (int i = 0; i < NUM_SESSIONS; ++i) {
             if (!session_list[i].in_use) {
+                pthread_mutex_lock(&session_list_mutex);
                 session_id = i;
                 session_list[session_id].in_use = true;
+                pthread_mutex_unlock(&session_list_mutex);
                 break;
             }
         }
@@ -299,10 +303,10 @@ int register_browser(int browser_socket_fd) {
  *
  * @param browser_socket_fd the socket file descriptor of the browser connected
  */
-void browser_handler(int browser_socket_fd) {
+void * browser_handler(void *browser_socket_fd) {
     int browser_id;
 
-    browser_id = register_browser(browser_socket_fd);
+    browser_id = register_browser(*(int *)browser_socket_fd);
 
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
@@ -322,7 +326,7 @@ void browser_handler(int browser_socket_fd) {
             browser_list[browser_id].in_use = false;
             pthread_mutex_unlock(&browser_list_mutex);
             printf("Browser #%d exited.\n", browser_id);
-            return;
+            return 0;
         }
 
         if (message[0] == '\0') {
@@ -387,7 +391,9 @@ void start_server(int port) {
         }
 
         // Starts the handler for the new browser.
-        browser_handler(browser_socket_fd);
+        pthread_t thread;
+        pthread_create(&thread, NULL, browser_handler, (void*)&browser_socket_fd);
+        // browser_handler(browser_socket_fd);
     }
 
     // Closes the socket.
