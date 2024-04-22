@@ -113,13 +113,22 @@ void register_server() {
  * Listens to the server; keeps receiving and printing the messages from the server in a while loop
  * if the browser is on.
  */
-void  * server_listener(void *arguments) {
-    while(browser_on) {
-        char message[BUFFER_LEN];
-        receive_message(server_socket_fd, message);
-        puts(message);
+void * server_listener(void *arguments) {
+    char message[BUFFER_LEN];
+    ssize_t received_bytes;
+
+    while (browser_on) {
+        received_bytes = receive_message(server_socket_fd, message);
+        if (received_bytes <= 0) {
+            return 0; // Exit loop if no more data received
+        }
+
+        if (strcmp(message, "ERROR") == 0) {
+            printf("Invalid input!\n");
+        } else {
+            printf("%s\n", message);
+        }
     }
-    return 0;
 }
 
 /**
