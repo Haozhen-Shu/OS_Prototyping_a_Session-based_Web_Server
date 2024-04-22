@@ -45,7 +45,7 @@ typedef struct session_struct {
     double values[NUM_VARIABLES];
 } session_t;
 
-std::unordered_map<int, session_t> session_map; // Declare session_map as a global variable
+std::unordered_map<int, session_t> session_map; /// Declare session_map as a global variable
 
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
