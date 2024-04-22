@@ -18,11 +18,18 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
-#include <unistd.h>
+#include <unistd.h> // for close, write, fsync
 #include <pthread.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
+#include <sys/stat.h> // for mode constants
 #include <netinet/in.h>
+
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <regex>
+
+
 
 #define NUM_VARIABLES 26
 #define NUM_SESSIONS 128
@@ -239,7 +246,23 @@ void get_session_file_path(int session_id, char path[]) {
  * Use get_session_file_path() to get the file path for each session.
  */
 void load_all_sessions() {
-    // TODO
+    try{
+        auto sessionsDir = std::filesystem::canonical(DATA_DIR);
+        for (auto file : std::filesystem::directory_iterator(sessionsDir)){
+            int sessionNumber = std::stoi(std::regex_replace(std::string(file.path().filename()), std::regex(R"([[^0-9]*([0-9]+).*])"), R"([$1])"));
+            std::ifstream sessionFile(file.path());
+            char variableName;
+            double value;
+
+            while (sessionFile >> variableName >> value){
+                session_list[sessionNumber].variables[(int)(variableName - 'A')] = true;
+                session_list[sessionNumber].values[(int)(variableName - 'A')] = value;
+            }
+            sessionFile.close();
+        }
+    }
+    catch(const std::filesystem::filesystem_error& ex){
+    }
 }
 
 /**
@@ -249,7 +272,19 @@ void load_all_sessions() {
  * @param session_id the session ID
  */
 void save_session(int session_id) {
-    // TODO
+   char path[26];
+    get_session_file_path(session_id, path);
+
+    std::ofstream sessionFile(path);
+
+    for (size_t i = 0; i < NUM_SESSIONS; i++){
+        for (size_t j = 0; j < NUM_VARIABLES; j++){
+            if (session_list[i].variables[j]){
+                sessionFile << (char)('A' + j) << " " << session_list[i].values[j] << '\n';
+            }
+        }
+    }
+    sessionFile.close();
 }
 
 /**
