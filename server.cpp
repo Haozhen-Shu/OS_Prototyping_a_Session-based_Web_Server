@@ -46,7 +46,6 @@ typedef struct session_struct {
 } session_t;
 
 std::unordered_map<int, session_t> session_map; // Declare session_map as a global variable
-std::unordered_set<int> used_session_ids;
 
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
@@ -328,17 +327,6 @@ void save_session(int session_id) {
  * @return the ID for the browser
  */
 
-int generate_unique_session_id() {
-   int session_id;
-    do {
-        // Generate a random session ID
-        session_id = rand();
-    } while (used_session_ids.count(session_id) > 0); // Check if ID is already used
-
-    used_session_ids.insert(session_id);
-   
-    return session_id;
-}
 
 int register_browser(int browser_socket_fd) {
     int browser_id;
@@ -352,18 +340,18 @@ int register_browser(int browser_socket_fd) {
         }
     }
 
-    
-    int session_id = generate_unique_session_id();
-    session_t new_session;
-    new_session.in_use = true;
-    session_map[session_id] = new_session;
+    char message[BUFFER_LEN];
+    receive_message(browser_socket_fd, message);
 
+    int session_id = strtol(message, NULL, 10);
+    if (session_id == -1) {
+        session_id = session_map.size(); // Use the next available session ID
+        session_map[session_id].in_use = true; // Mark the session as in use
+    }
     browser_list[browser_id].session_id = session_id;
 
-    char message[BUFFER_LEN];
     sprintf(message, "%d", session_id);
     send_message(browser_socket_fd, message);
-
     return browser_id;
 }
 
