@@ -23,6 +23,9 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
+#include <filesystem> //
+#include <fstream> // 
+
 #define COOKIE_PATH "./browser.cookie"
 
 static bool browser_on = true;  // Determines if the browser is on/off.
@@ -79,8 +82,10 @@ void read_user_input(char message[]) {
  * The file path of the cookie is stored in COOKIE_PATH.
  */
 void load_cookie() {
-    // TODO
     session_id = -1;
+    if (std::filesystem::is_regular_file(COOKIE_PATH)) {
+        std::ifstream(COOKIE_PATH) >> session_id;
+    }
 }
 
 /**
@@ -88,7 +93,8 @@ void load_cookie() {
  * The file path of the cookie is stored in COOKIE_PATH.
  */
 void save_cookie() {
-    // TODO
+    std::ofstream cookie(COOKIE_PATH);
+    cookie << session_id;
 }
 
 /**
