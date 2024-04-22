@@ -57,7 +57,7 @@ std::unordered_map<int, session_t> session_map; /// Declare session_map as a glo
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
-static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
+static pthread_mutex_t session_map_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
 
 // Returns the string format of the given session.
 // There will be always 9 digits in the output string.
@@ -322,8 +322,12 @@ void load_all_sessions() {
             double value;
 
             while (sessionFile >> variableName >> value){
-                session_list[sessionNumber].variables[(int)(variableName - 'A')] = true;
-                session_list[sessionNumber].values[(int)(variableName - 'A')] = value;
+                // session_list[sessionNumber].variables[(int)(variableName - 'A')] = true;
+                session_map[sessionNumber].variables[(int)(variableName - 'A')] = true;
+
+                // session_list[sessionNumber].values[(int)(variableName - 'A')] = value;
+                session_map[sessionNumber].values[(int)(variableName - 'A')] = value;
+
             }
             sessionFile.close();
         }
@@ -346,9 +350,13 @@ void save_session(int session_id) {
 
     for (size_t i = 0; i < NUM_SESSIONS; i++){
         for (size_t j = 0; j < NUM_VARIABLES; j++){
-            if (session_list[i].variables[j]){
-                sessionFile << (char)('A' + j) << " " << session_list[i].values[j] << '\n';
+            // if (session_list[i].variables[j]){
+            //     sessionFile << (char)('A' + j) << " " << session_list[i].values[j] << '\n';
+            // }
+            if (session_map[i].variables[j]){
+                    sessionFile << (char)('A' + j) << " " << session_map[i].values[j] << '\n';
             }
+
         }
     }
     sessionFile.close();
@@ -382,10 +390,10 @@ int register_browser(int browser_socket_fd) {
 
     int session_id = strtol(message, NULL, 10);
     if (session_id == -1) {
-        pthread_mutex_lock(&session_list_mutex);
+        pthread_mutex_lock(&session_map_mutex);
         session_id = session_map.size(); // Use the next available session ID
         session_map[session_id].in_use = true; // Mark the session as in use
-        pthread_mutex_unlock(&session_list_mutex);
+        pthread_mutex_unlock(&session_map_mutex);
     }
     browser_list[browser_id].session_id = session_id;
 
