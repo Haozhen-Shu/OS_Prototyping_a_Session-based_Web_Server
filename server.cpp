@@ -332,7 +332,8 @@ void load_all_sessions() {
             sessionFile.close();
         }
     }
-    catch(const std::filesystem::filesystem_error& ex){
+    //catch(const std::filesystem::filesystem_error& ex){
+    catch(...){
     }
 }
 
